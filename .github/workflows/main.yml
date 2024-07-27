@@ -1,14 +1,15 @@
-name: Publish 🚀
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-    - main
+name: build and test 🚀
+run-name: ${{ gitea.actor }} is testing out Gitea Actions
+on: [push]
 
 env:
-  AZURE_WEBAPP_NAME: current-time-service
-  AZURE_WEBAPP_PACKAGE_PATH: "./publish"
+  DOTNET_VERSION: '6.x.x' # The .NET SDK version to use
+  PACKAGE_PATH: "./publish"
+  PROJECT_PATH: ./CurrentTimeService.sln
+  CONFIGURATION: Release
+  #REGISTRY: ghcr.io # Use docker.io for Docker Hub if empty
+  IMAGE_NAME: ${{ gitea.actor }}/${{ gitea.repository }}
+  DOCKERHUB_USERNAME: avydev #dckr_pat_5Xk4yjcnEvmE2oCvEamtmD009OI
 
 jobs:
   publish:
@@ -20,20 +21,44 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
           
       - name: Restore
-        run: dotnet restore ./CurrentTimeService.sln
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
         
       - name: Build
-        run: dotnet build ./CurrentTimeService.sln --configuration Release --no-restore
+        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
         
+      - name: Test
+        run: dotnet test "${{ env.PROJECT_PATH }}" --no-restore --verbosity normal
+
       - name: Publish
-        run: dotnet publish ./CurrentTimeService.sln --configuration Release --no-build --output '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}'
-        
-      - name: Deployment
-        uses: azure/webapps-deploy@v2
+        run: dotnet publish "${{ env.PROJECT_PATH }}" --configuration ${{ env.CONFIGURATION }} --no-build --output '${{ env.PACKAGE_PATH }}'
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3.1.0
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          package: "${{ env.AZURE_WEBAPP_PACKAGE_PATH }}"
+          #registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+
+      # - name: Build and push Docker image
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     push: true
+      #     file: ./CurrentTimeService/Dockerfile
+      #     tags: ${{ env.DOCKERHUB_USERNAME }}/${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and Push image
+        run: |
+          docker buildx build \
+            --file ./CurrentTimeService/Dockerfile \
+            --platform linux/amd64 \
+            --tag ${{ steps.meta.outputs.tags }} \
+            --push .
