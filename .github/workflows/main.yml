@@ -1,5 +1,5 @@
 name: build and test 🚀
-run-name: ${{ gitea.actor }} is testing out Gitea Actions
+run-name: ${{ github.actor }} is testing out Gitea Actions
 on: [push]
 
 env:
@@ -8,7 +8,7 @@ env:
   PROJECT_PATH: ./CurrentTimeService.sln
   CONFIGURATION: Release
   #REGISTRY: ghcr.io # Use docker.io for Docker Hub if empty
-  IMAGE_NAME: ${{ gitea.actor }}/${{ gitea.repository }}
+  IMAGE_NAME: ${{ github.actor }}/${{ github.repository }}
   DOCKERHUB_USERNAME: avydev #dckr_pat_5Xk4yjcnEvmE2oCvEamtmD009OI
 
 jobs:
